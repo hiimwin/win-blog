@@ -1,8 +1,11 @@
-using Microsoft.AspNetCore.Identity;
+﻿using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Swashbuckle.AspNetCore.SwaggerGen;
 using System.Reflection;
 using WinBlog.Api;
+using WinBlog.Api.Filters;
+using WinBlog.Api.Services;
+using WinBlog.Core.ConfigOptions;
 using WinBlog.Core.Domain.Identity;
 using WinBlog.Core.Models.Content;
 using WinBlog.Core.SeedWorks;
@@ -13,6 +16,15 @@ using WinBlog.Data.SeedWorks;
 var builder = WebApplication.CreateBuilder(args);
 var configuration = builder.Configuration;
 var connectionString = configuration.GetConnectionString("DefaultConnection");
+var WinCorsPolicy = "WinCorsPolicy";
+
+builder.Services.AddCors(o => o.AddPolicy(WinCorsPolicy, builder =>
+{
+    builder.AllowAnyMethod()
+        .AllowAnyHeader()
+        .WithOrigins(configuration["AllowedOrigins"])
+        .AllowCredentials();
+}));
 // Add services to the container.
 builder.Services.AddScoped(typeof(IRepository<,>), typeof(RepositoryBase<,>));
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
@@ -61,6 +73,13 @@ builder.Services.Configure<IdentityOptions>(options =>
 
 builder.Services.AddAutoMapper(typeof(PostInListDto));
 
+//Authen and author
+builder.Services.Configure<JwtTokenSettings>(configuration.GetSection("JwtTokenSettings"));
+builder.Services.AddScoped<SignInManager<AppUser>, SignInManager<AppUser>>();
+builder.Services.AddScoped<UserManager<AppUser>, UserManager<AppUser>>();
+builder.Services.AddScoped<ITokenService, TokenService>();
+builder.Services.AddScoped<RoleManager<AppRole>, RoleManager<AppRole>>();
+
 //Default config for ASP.NET Core
 builder.Services.AddControllers();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
@@ -77,6 +96,7 @@ builder.Services.AddSwaggerGen(c =>
         Title = "API for Administrators",
         Description = "API for CMS core domain. This domain keeps track of campaigns, campaign rules, and campaign execution."
     });
+    c.ParameterFilter<SwaggerNullableParameterFilter>();
 });
 
 var app = builder.Build();
@@ -92,7 +112,7 @@ if (app.Environment.IsDevelopment())
         c.DisplayRequestDuration();
     });
 }
-
+app.UseCors(WinCorsPolicy);
 app.UseHttpsRedirection();
 
 app.UseAuthorization();
