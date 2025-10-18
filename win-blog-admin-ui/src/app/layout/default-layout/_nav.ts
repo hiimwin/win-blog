@@ -8,6 +8,9 @@ export const navItems: INavData[] = [
     badge: {
       color: 'info',
       text: 'NEW'
+    },
+    attributes: {
+      "policyName": "Permissions.Dashboard.View"
     }
   },
   {
@@ -18,22 +21,34 @@ export const navItems: INavData[] = [
       {
         name: 'Danh mục',
         url: '/content/post-categories',
-        icon: 'nav-icon-bullet'
+        icon: 'nav-icon-bullet',
+        attributes: {
+          "policyName": "Permissions.PostCategories.View"
+        }
       },
       {
         name: 'Bài viết',
         url: '/content/posts',
-        icon: 'nav-icon-bullet'
+        icon: 'nav-icon-bullet',
+        attributes: {
+          "policyName": "Permissions.Posts.View"
+        }
       },
       {
         name: 'Loạt bài',
         url: '/content/series',
-        icon: 'nav-icon-bullet'
+        icon: 'nav-icon-bullet',
+        attributes: {
+          "policyName": "Permissions.Series.View"
+        }
       },
       {
         name: 'Nhuận bút',
         url: '/content/royalty',
-        icon: 'nav-icon-bullet'
+        icon: 'nav-icon-bullet',
+        attributes: {
+          "policyName": "Permissions.Loyalty.View"
+        }
       }
     ]
   },
@@ -45,12 +60,18 @@ export const navItems: INavData[] = [
       {
         name: 'Phân Quyền',
         url: '/system/roles',
-        icon: 'nav-icon-bullet'
+        icon: 'nav-icon-bullet',
+        attributes: {
+          "policyName": "Permissions.Roles.View"
+        }
       },
       {
         name: 'Người dùng',
         url: '/system/uers',
-        icon: 'nav-icon-bullet'
+        icon: 'nav-icon-bullet',
+        attributes: {
+          "policyName": "Permissions.Users.View"
+        }
       }
     ]
   },

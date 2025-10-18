@@ -1,8 +1,14 @@
-﻿using Microsoft.AspNetCore.Identity;
+﻿using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 using Swashbuckle.AspNetCore.SwaggerGen;
 using System.Reflection;
+using System.Security.Cryptography;
+using System.Text;
 using WinBlog.Api;
+using WinBlog.Api.Authorization;
 using WinBlog.Api.Filters;
 using WinBlog.Api.Services;
 using WinBlog.Core.ConfigOptions;
@@ -17,7 +23,8 @@ var builder = WebApplication.CreateBuilder(args);
 var configuration = builder.Configuration;
 var connectionString = configuration.GetConnectionString("DefaultConnection");
 var WinCorsPolicy = "WinCorsPolicy";
-
+builder.Services.AddSingleton<IAuthorizationPolicyProvider, PermissionPolicyProvider>();
+builder.Services.AddScoped<IAuthorizationHandler, PermissionAuthorizationHandler>();
 builder.Services.AddCors(o => o.AddPolicy(WinCorsPolicy, builder =>
 {
     builder.AllowAnyMethod()
@@ -97,6 +104,79 @@ builder.Services.AddSwaggerGen(c =>
         Description = "API for CMS core domain. This domain keeps track of campaigns, campaign rules, and campaign execution."
     });
     c.ParameterFilter<SwaggerNullableParameterFilter>();
+    var used = new Dictionary<string, Type>(StringComparer.Ordinal);
+
+    c.CustomSchemaIds(type =>
+    {
+        string PrettyName(Type t)
+        {
+            if (t.IsGenericType)
+            {
+                var root = t.Name.Split('`')[0]; // PagedResult
+                var args = t.GetGenericArguments().Select(PrettyName);
+                // RoleDtoPagedResult (đổi thành PagedResultOfRoleDto nếu thích)
+                return string.Join("", args) + root;
+            }
+            return t.Name;
+        }
+
+        string baseName = PrettyName(type);
+
+        // Chưa dùng -> dùng luôn tên “đẹp”
+        if (!used.ContainsKey(baseName))
+        {
+            used[baseName] = type;
+            return baseName;
+        }
+
+        // Nếu trùng nhưng là cùng type → trả về cùng tên (idempotent)
+        if (used[baseName] == type)
+            return baseName;
+
+        // Thêm hậu tố namespace cuối
+        var nsTail = type.Namespace?.Split('.').LastOrDefault();
+        var candidate = string.IsNullOrEmpty(nsTail) ? baseName : $"{baseName}_{nsTail}";
+        if (!used.ContainsKey(candidate))
+        {
+            used[candidate] = type;
+            return candidate;
+        }
+
+        // Fallback: thêm hash 8 ký tự từ FullName để đảm bảo duy nhất và ổn định
+        static string ShortHash(string? s)
+        {
+            if (string.IsNullOrEmpty(s)) return "x";
+            using var sha1 = SHA1.Create();
+            var bytes = sha1.ComputeHash(Encoding.UTF8.GetBytes(s));
+            return Convert.ToHexString(bytes, 0, 4).ToLower(); // 8 hex chars
+        }
+
+        var unique = $"{baseName}_{ShortHash(type.FullName)}";
+        // Nếu vẫn trùng (rất khó), thêm cả counter
+        var finalName = unique;
+        int i = 1;
+        while (used.ContainsKey(finalName)) finalName = $"{unique}_{i++}";
+
+        used[finalName] = type;
+        return finalName;
+    });
+});
+
+builder.Services.AddAuthentication(o =>
+{
+    o.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    o.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+}).AddJwtBearer(cfg =>
+{
+    cfg.RequireHttpsMetadata = false;
+    cfg.SaveToken = true;
+
+    cfg.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidIssuer = configuration["JwtTokenSettings:Issuer"],
+        ValidAudience = configuration["JwtTokenSettings:Issuer"],
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(configuration["JwtTokenSettings:Key"]))
+    };
 });
 
 var app = builder.Build();
@@ -114,7 +194,7 @@ if (app.Environment.IsDevelopment())
 }
 app.UseCors(WinCorsPolicy);
 app.UseHttpsRedirection();
-
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
