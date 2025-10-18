@@ -15,11 +15,18 @@ import { routes } from './app.routes';
 import { ADMIN_API_BASE_URL, AdminApiAuthApiClient } from '../app/api/admin-api.service.generated';
 import { environment } from '../environments/environment';
 import { ToastModule } from 'primeng/toast';
-import { MessageService } from 'primeng/api';
+import { MessageService, ConfirmationService } from 'primeng/api';
 import { AlertService } from './shared/services/alert.service';
-import { provideHttpClient } from '@angular/common/http';
+import { HTTP_INTERCEPTORS, provideHttpClient } from '@angular/common/http';
 import { providePrimeNG } from 'primeng/config';
 import Aura from '@primeuix/themes/aura'
+import { TokenStorageService } from './shared/services/token-storage.service';
+import { TokenInterceptor } from './shared/interceptors/token.interceptor';
+import { GlobalHttpInterceptorService } from './shared/interceptors/error-handler.interceptor';
+import { Panel } from 'primeng/panel';
+import { AdminApiRoleApiClient } from './api/admin-api.service.generated';
+import { DialogService } from 'primeng/dynamicdialog';
+
 export const appConfig: ApplicationConfig = {
   providers: [
     provideRouter(routes,
@@ -46,6 +53,20 @@ export const appConfig: ApplicationConfig = {
     AlertService,
     AdminApiAuthApiClient,
     [provideHttpClient()],
-    
+    TokenStorageService,
+    {
+      provide: HTTP_INTERCEPTORS,
+      useClass: TokenInterceptor,
+      multi: true
+    },
+    {
+      provide: HTTP_INTERCEPTORS,
+      useClass: GlobalHttpInterceptorService,
+      multi: true
+    },
+    Panel,
+    AdminApiRoleApiClient,
+    DialogService,
+    ConfirmationService
   ]
 };
